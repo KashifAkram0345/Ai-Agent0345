@@ -1,6 +1,6 @@
 # NOVA — Personal AI Agent
 
-NOVA is a production-ready personal AI workspace built with Next.js, TypeScript, MongoDB/Mongoose, Google OAuth, and Ollama. It keeps conversations private in your own database and never uses a paid AI API.
+NOVA is a production-ready personal AI workspace built with Next.js, TypeScript, MongoDB/Mongoose, Google OAuth, and OpenRouter. It keeps conversations private in your own database and defaults to OpenRouter’s free model router.
 
 ## Environment
 
@@ -12,8 +12,8 @@ Copy `.env.example` to `.env.local` and add these values through Replit Secrets 
 | `GOOGLE_CLIENT_ID` | Google OAuth client ID |
 | `GOOGLE_CLIENT_SECRET` | Google OAuth client secret |
 | `GOOGLE_CALLBACK_URL` | OAuth redirect registered in Google Cloud |
-| `OLLAMA_BASE_URL` | Local or remote Ollama-compatible endpoint |
-| `OLLAMA_MODEL` | Ollama model name, defaults to `llama3.2` |
+| `OPENROUTER_API_KEY` | OpenRouter API key |
+| `OPENROUTER_MODEL` | OpenRouter model ID, defaults to `openrouter/free` |
 | `NEXTAUTH_SECRET` | Long random secret for encrypted auth tokens |
 | `NEXTAUTH_URL` | Public app URL in production |
 
@@ -26,7 +26,7 @@ npm install
 npm run dev
 ```
 
-Check the service configuration at `GET /api/health`. A healthy response requires MongoDB, Ollama, and all authentication secrets to be available. Install `llama3.2` on the Ollama host with `ollama pull llama3.2`.
+Check the service configuration at `GET /api/health`. A healthy response requires MongoDB, OpenRouter, and all authentication secrets to be available. `openrouter/free` automatically routes to an available free model; free model availability can change on OpenRouter.
 
 ## Safety
 
@@ -34,4 +34,4 @@ The agent has three allowlisted tools: arithmetic, current date/time, and recent
 
 ## Deploy
 
-The app is compatible with Replit or Vercel. Ensure the deployment can reach both MongoDB and the Ollama endpoint, and register the deployment URL as the Google OAuth callback before testing sign-in.
+The app is compatible with Replit or Vercel. Ensure the deployment can reach MongoDB and OpenRouter, add `OPENROUTER_API_KEY` as a server-side environment secret, and register the deployment URL as the Google OAuth callback before testing sign-in.
