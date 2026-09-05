@@ -2,7 +2,7 @@ import Link from "next/link";
 
 const features = [
   ["01", "Private by design", "Your conversations live in your MongoDB. NOVA never trains on your data."],
-  ["02", "Free AI engine", "Use Ollama and your own local or remote model endpoint. No paid AI API required."],
+  ["02", "Free AI engine", "Use OpenRouter’s free model routing without locking your workspace to a paid AI provider."],
   ["03", "Actually remembers", "Keep a searchable trail of your thinking instead of starting from zero every time."],
 ];
 
@@ -31,13 +31,13 @@ export default function HomePage() {
             <span className="block bg-gradient-to-r from-violet-300 via-fuchsia-200 to-mint bg-clip-text text-transparent">stays in the room.</span>
           </h1>
           <p className="mt-8 max-w-2xl text-lg leading-8 text-slate-400">
-            NOVA is a personal AI workspace for ideas, decisions, and the messy middle. Powered by your Ollama model, backed by your MongoDB, and ready whenever you are.
+            NOVA is a personal AI workspace for ideas, decisions, and the messy middle. Powered by OpenRouter, backed by your MongoDB, and ready whenever you are.
           </p>
           <div className="mt-10 flex flex-wrap items-center gap-4">
             <Link href="/login" className="rounded-full bg-white px-6 py-3.5 text-sm font-semibold text-ink transition hover:bg-violet-100">
               Start a conversation <span className="ml-2">↗</span>
             </Link>
-            <span className="text-sm text-slate-500">Free to run with Ollama</span>
+            <span className="text-sm text-slate-500">Free model routing via OpenRouter</span>
           </div>
         </div>
 
