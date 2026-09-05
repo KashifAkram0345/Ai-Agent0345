@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { signOut } from "next-auth/react";
 import { MarkdownMessage } from "@/components/markdown-message";
 
 type Conversation = { _id: string; title: string; updatedAt: string };
@@ -96,7 +95,7 @@ export default function ChatClient({ user }: Props) {
           <div className="flex items-center gap-3">
             {user.image ? <div aria-label={`${user.name} profile photo`} role="img" className="h-9 w-9 rounded-full bg-cover bg-center" style={{ backgroundImage: `url("${user.image}")` }} /> : <div className="flex h-9 w-9 items-center justify-center rounded-full bg-violet-400/20 text-sm text-violet-200">{user.name[0]}</div>}
             <div className="min-w-0 flex-1"><p className="truncate text-sm text-white">{user.name}</p><p className="truncate text-xs text-slate-500">{user.email}</p></div>
-            <button onClick={() => signOut({ callbackUrl: "/" })} className="text-xs text-slate-500 hover:text-white">Exit</button>
+            <span className="text-xs text-slate-500">Guest</span>
           </div>
         </div>
       </aside>

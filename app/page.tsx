@@ -15,8 +15,8 @@ export default function HomePage() {
           <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-lilac text-sm text-ink shadow-glow">N</span>
           NOVA
         </Link>
-        <Link href="/login" className="rounded-full border border-line px-5 py-2 text-sm text-slate-300 transition hover:border-lilac hover:text-white">
-          Sign in
+        <Link href="/chat" className="rounded-full border border-line px-5 py-2 text-sm text-slate-300 transition hover:border-lilac hover:text-white">
+          Open workspace
         </Link>
       </nav>
 
@@ -34,7 +34,7 @@ export default function HomePage() {
             NOVA is a personal AI workspace for ideas, decisions, and the messy middle. Powered by OpenRouter, backed by your MongoDB, and ready whenever you are.
           </p>
           <div className="mt-10 flex flex-wrap items-center gap-4">
-            <Link href="/login" className="rounded-full bg-white px-6 py-3.5 text-sm font-semibold text-ink transition hover:bg-violet-100">
+            <Link href="/chat" className="rounded-full bg-white px-6 py-3.5 text-sm font-semibold text-ink transition hover:bg-violet-100">
               Start a conversation <span className="ml-2">↗</span>
             </Link>
             <span className="text-sm text-slate-500">Free model routing via OpenRouter</span>

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireSession } from "@/lib/auth";
+import { requireSession } from "@/lib/session";
 import { Conversation } from "@/lib/models/Conversation";
 import { rateLimit } from "@/lib/rate-limit";
 

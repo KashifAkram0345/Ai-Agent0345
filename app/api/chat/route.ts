@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import mongoose from "mongoose";
-import { requireSession } from "@/lib/auth";
+import { requireSession } from "@/lib/session";
 import { Conversation } from "@/lib/models/Conversation";
 import { Message } from "@/lib/models/Message";
 import { runAgent } from "@/lib/agent";

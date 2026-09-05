@@ -5,7 +5,6 @@ export async function GET() {
   const checks = {
     mongodb: false,
     openrouter: false,
-    auth: Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET && process.env.NEXTAUTH_SECRET),
   };
   try {
     await connectToDatabase();
@@ -21,6 +20,6 @@ export async function GET() {
       checks.openrouter = response.ok;
     } catch {}
   }
-  const healthy = checks.mongodb && checks.openrouter && checks.auth;
+  const healthy = checks.mongodb && checks.openrouter;
   return NextResponse.json({ status: healthy ? "ok" : "degraded", checks, model: process.env.OPENROUTER_MODEL || "openrouter/free" }, { status: healthy ? 200 : 503 });
 }
