@@ -19,7 +19,7 @@ export default function LoginPage() {
           <span className="text-base font-bold">G</span>
           Continue with Google
         </button>
-        <p className="mt-7 text-center text-xs leading-5 text-slate-600">Your Google account is only used for authentication. Your AI provider remains your Ollama endpoint.</p>
+        <p className="mt-7 text-center text-xs leading-5 text-slate-600">Your Google account is only used for authentication. Your AI provider remains configured through OpenRouter.</p>
       </div>
     </main>
   );
