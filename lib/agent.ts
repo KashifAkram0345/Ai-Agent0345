@@ -68,8 +68,9 @@ function toolResult(input: string, history: MessageDocument[]) {
 }
 
 export async function runAgent(input: string, history: MessageDocument[]) {
-  const baseUrl = (process.env.OLLAMA_BASE_URL || "http://localhost:11434").replace(/\/$/, "");
-  const model = process.env.OLLAMA_MODEL || "llama3.2";
+  const apiKey = process.env.OPENROUTER_API_KEY;
+  if (!apiKey) throw new Error("Missing OPENROUTER_API_KEY environment variable.");
+  const model = process.env.OPENROUTER_MODEL || "openrouter/free";
   const tool = toolResult(input, history);
   const conversation: AgentMessage[] = [
     { role: "system", content: systemPrompt },
@@ -77,15 +78,25 @@ export async function runAgent(input: string, history: MessageDocument[]) {
     ...(tool ? [{ role: "system" as const, content: `[Safe tool result]\n${tool}` }] : []),
     { role: "user", content: input },
   ];
-  const response = await fetch(`${baseUrl}/api/chat`, {
+  const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`,
+      ...(process.env.NEXTAUTH_URL ? { "HTTP-Referer": process.env.NEXTAUTH_URL } : {}),
+      "X-Title": "NOVA Personal AI Agent",
+    },
     body: JSON.stringify({ model, messages: conversation, stream: false }),
     signal: AbortSignal.timeout(90_000),
   });
-  if (!response.ok) throw new Error(`Ollama returned ${response.status}. Check OLLAMA_BASE_URL and model availability.`);
-  const data = await response.json() as { message?: { content?: string } };
-  const content = data.message?.content?.trim();
-  if (!content) throw new Error("Ollama returned an empty response.");
+  const data = await response.json().catch(() => ({})) as {
+    choices?: Array<{ message?: { content?: string } }>;
+    error?: { message?: string };
+  };
+  if (!response.ok) {
+    throw new Error(data.error?.message || `OpenRouter returned ${response.status}. Check OPENROUTER_API_KEY and model availability.`);
+  }
+  const content = data.choices?.[0]?.message?.content?.trim();
+  if (!content) throw new Error("OpenRouter returned an empty response.");
   return content;
 }
