@@ -94,7 +94,7 @@ export default function ChatClient({ user }: Props) {
         </div>
         <div className="border-t border-line p-4">
           <div className="flex items-center gap-3">
-            {user.image ? <img src={user.image} alt="" className="h-9 w-9 rounded-full" /> : <div className="flex h-9 w-9 items-center justify-center rounded-full bg-violet-400/20 text-sm text-violet-200">{user.name[0]}</div>}
+            {user.image ? <div aria-label={`${user.name} profile photo`} role="img" className="h-9 w-9 rounded-full bg-cover bg-center" style={{ backgroundImage: `url("${user.image}")` }} /> : <div className="flex h-9 w-9 items-center justify-center rounded-full bg-violet-400/20 text-sm text-violet-200">{user.name[0]}</div>}
             <div className="min-w-0 flex-1"><p className="truncate text-sm text-white">{user.name}</p><p className="truncate text-xs text-slate-500">{user.email}</p></div>
             <button onClick={() => signOut({ callbackUrl: "/" })} className="text-xs text-slate-500 hover:text-white">Exit</button>
           </div>
@@ -104,7 +104,7 @@ export default function ChatClient({ user }: Props) {
       <section className="flex min-w-0 flex-1 flex-col">
         <header className="flex h-[73px] items-center border-b border-line px-5 md:px-8">
           <button onClick={() => setSidebarOpen(true)} className="mr-4 text-slate-400 md:hidden">☰</button>
-          <div><p className="text-sm font-medium text-white">{activeId ? conversations.find((item) => item._id === activeId)?.title : "New conversation"}</p><p className="mt-1 text-xs text-slate-600">Ollama · private workspace</p></div>
+          <div><p className="text-sm font-medium text-white">{activeId ? conversations.find((item) => item._id === activeId)?.title : "New conversation"}</p><p className="mt-1 text-xs text-slate-600">OpenRouter · private workspace</p></div>
           <div className="ml-auto flex items-center gap-2 text-xs text-slate-500"><span className="h-1.5 w-1.5 rounded-full bg-mint" /> ready</div>
         </header>
         <div className="flex-1 overflow-y-auto">
