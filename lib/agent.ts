@@ -2,6 +2,13 @@ import type { MessageDocument } from "@/lib/models/Message";
 
 type AgentMessage = { role: "system" | "user" | "assistant"; content: string };
 
+export class OpenRouterError extends Error {
+  constructor(public readonly upstreamStatus: number, message: string) {
+    super(message);
+    this.name = "OpenRouterError";
+  }
+}
+
 const systemPrompt = `You are NOVA, a thoughtful personal AI agent. Be concise but useful.
 You can use three safe tools when needed:
 1. calculator — evaluate arithmetic only
@@ -69,7 +76,7 @@ function toolResult(input: string, history: MessageDocument[]) {
 
 export async function runAgent(input: string, history: MessageDocument[]) {
   const apiKey = process.env.OPENROUTER_API_KEY;
-  if (!apiKey) throw new Error("Missing OPENROUTER_API_KEY environment variable.");
+  if (!apiKey) throw new OpenRouterError(503, "AI service is not configured. Please try again later.");
   const model = process.env.OPENROUTER_MODEL || "openrouter/free";
   const tool = toolResult(input, history);
   const conversation: AgentMessage[] = [
@@ -83,7 +90,7 @@ export async function runAgent(input: string, history: MessageDocument[]) {
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${apiKey}`,
-      ...(process.env.NEXTAUTH_URL ? { "HTTP-Referer": process.env.NEXTAUTH_URL } : {}),
+      ...(process.env.OPENROUTER_SITE_URL ? { "HTTP-Referer": process.env.OPENROUTER_SITE_URL } : {}),
       "X-Title": "NOVA Personal AI Agent",
     },
     body: JSON.stringify({ model, messages: conversation, stream: false }),
@@ -94,7 +101,16 @@ export async function runAgent(input: string, history: MessageDocument[]) {
     error?: { message?: string };
   };
   if (!response.ok) {
-    throw new Error(data.error?.message || `OpenRouter returned ${response.status}. Check OPENROUTER_API_KEY and model availability.`);
+    if (response.status === 401) {
+      throw new OpenRouterError(401, "AI provider authentication failed. Please check the server configuration.");
+    }
+    if (response.status === 429) {
+      throw new OpenRouterError(429, "AI provider is temporarily busy. Please try again shortly.");
+    }
+    if (response.status >= 500) {
+      throw new OpenRouterError(response.status, "AI provider is temporarily unavailable. Please try again.");
+    }
+    throw new OpenRouterError(400, data.error?.message || "AI provider rejected the request. Please try again.");
   }
   const content = data.choices?.[0]?.message?.content?.trim();
   if (!content) throw new Error("OpenRouter returned an empty response.");

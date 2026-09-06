@@ -5,7 +5,25 @@ import { MarkdownMessage } from "@/components/markdown-message";
 
 type Conversation = { _id: string; title: string; updatedAt: string };
 type Message = { _id: string; role: "user" | "assistant"; content: string; createdAt: string };
-type Props = { user: { name: string; email?: string; image?: string | null } };
+type Props = { user: { name: string; email?: string } };
+
+const STARTER_PROMPTS = [
+  "What is JavaScript?",
+  "Explain React in simple words.",
+  "Write a Node.js API.",
+  "What is MongoDB?",
+  "Help me debug my code.",
+];
+
+function formatTime(value: string) {
+  return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
+}
+
+async function parseResponse(response: Response) {
+  const data = await response.json().catch(() => ({})) as Record<string, unknown>;
+  if (!response.ok) throw new Error(typeof data.error === "string" ? data.error : "Something went wrong. Please try again.");
+  return data;
+}
 
 export default function ChatClient({ user }: Props) {
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -21,19 +39,24 @@ export default function ChatClient({ user }: Props) {
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, loading]);
 
   async function loadConversations() {
-    const response = await fetch("/api/conversations");
-    if (!response.ok) return;
-    const data = await response.json();
-    setConversations(data.conversations);
+    try {
+      const data = await parseResponse(await fetch("/api/conversations")) as { conversations: Conversation[] };
+      setConversations(data.conversations);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Unable to load conversation history.");
+    }
   }
 
   async function openConversation(id: string) {
     setActiveId(id);
     setSidebarOpen(false);
-    const response = await fetch(`/api/conversations/${id}`);
-    if (!response.ok) return;
-    const data = await response.json();
-    setMessages(data.messages);
+    setError("");
+    try {
+      const data = await parseResponse(await fetch(`/api/conversations/${id}`)) as { messages: Message[] };
+      setMessages(data.messages);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Unable to load this conversation.");
+    }
   }
 
   function newChat() {
@@ -45,35 +68,109 @@ export default function ChatClient({ user }: Props) {
   }
 
   async function deleteConversation(id: string) {
-    const response = await fetch(`/api/conversations/${id}`, { method: "DELETE" });
-    if (!response.ok) return;
-    setConversations((items) => items.filter((item) => item._id !== id));
-    if (activeId === id) newChat();
+    if (!window.confirm("Delete this conversation and all of its messages?")) return;
+    try {
+      await parseResponse(await fetch(`/api/conversations/${id}`, { method: "DELETE" }));
+      setConversations((items) => items.filter((item) => item._id !== id));
+      if (activeId === id) newChat();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Unable to delete this conversation.");
+    }
   }
 
-  async function sendMessage() {
-    const content = input.trim();
-    if (!content || loading) return;
+  async function renameConversation(id: string) {
+    const currentTitle = conversations.find((item) => item._id === id)?.title || "";
+    const title = window.prompt("Rename conversation", currentTitle)?.trim();
+    if (!title || title === currentTitle) return;
+    try {
+      const data = await parseResponse(await fetch(`/api/conversations/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title }),
+      })) as { conversation: Conversation };
+      setConversations((items) => items.map((item) => item._id === id ? data.conversation : item));
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Unable to rename this conversation.");
+    }
+  }
+
+  async function clearConversation() {
+    if (!activeId || !window.confirm("Clear all messages from this conversation?")) return;
+    try {
+      const data = await parseResponse(await fetch(`/api/conversations/${activeId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ clear: true }),
+      })) as { conversation: Conversation };
+      setMessages([]);
+      setConversations((items) => items.map((item) => item._id === activeId ? data.conversation : item));
+      setError("");
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Unable to clear this conversation.");
+    }
+  }
+
+  async function sendMessage(nextInput?: string) {
+    const content = (nextInput ?? input).trim();
+    if (!content) {
+      setError("Message cannot be empty.");
+      return;
+    }
+    if (loading) return;
     setInput("");
     setError("");
     const optimistic: Message = { _id: `temp-${Date.now()}`, role: "user", content, createdAt: new Date().toISOString() };
     setMessages((items) => [...items, optimistic]);
     setLoading(true);
-    const response = await fetch("/api/chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ conversationId: activeId, message: content }) });
-    const data = await response.json().catch(() => ({}));
-    setLoading(false);
-    if (!response.ok) {
-      setError(data.error || "Something went wrong.");
-      return;
+    try {
+      const data = await parseResponse(await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ conversationId: activeId, message: content }),
+      })) as { conversationId: string; message: Message };
+      setActiveId(data.conversationId);
+      setMessages((items) => [...items.filter((item) => item._id !== optimistic._id), data.message]);
+      await loadConversations();
+    } catch (reason) {
+      setMessages((items) => items.filter((item) => item._id !== optimistic._id));
+      setError(reason instanceof Error ? reason.message : "Unable to connect to the AI service. Please try again.");
+    } finally {
+      setLoading(false);
     }
-    setActiveId(data.conversationId);
-    setMessages((items) => [...items, data.message]);
-    await loadConversations();
+  }
+
+  async function regenerateAnswer(messageId: string) {
+    if (!activeId || loading) return;
+    setError("");
+    setLoading(true);
+    try {
+      const data = await parseResponse(await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ conversationId: activeId, regenerate: true }),
+      })) as { message: Message };
+      setMessages((items) => [...items.filter((item) => item._id !== messageId), data.message]);
+      await loadConversations();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Unable to regenerate the answer.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function copyAnswer(content: string) {
+    try {
+      await navigator.clipboard.writeText(content);
+      setError("");
+    } catch {
+      setError("Unable to copy the answer. Please select and copy it manually.");
+    }
   }
 
   return (
     <main className="flex h-screen overflow-hidden bg-ink">
-      <aside className={`${sidebarOpen ? "translate-x-0" : "-translate-x-full"} fixed inset-y-0 left-0 z-20 flex w-80 flex-col border-r border-line bg-panel transition-transform md:relative md:translate-x-0`}>
+      {sidebarOpen && <button aria-label="Close navigation" onClick={() => setSidebarOpen(false)} className="fixed inset-0 z-10 bg-black/60 md:hidden" />}
+      <aside className={`${sidebarOpen ? "translate-x-0" : "-translate-x-full"} fixed inset-y-0 left-0 z-20 flex w-[min(20rem,calc(100vw-2rem))] flex-col border-r border-line bg-panel transition-transform md:relative md:translate-x-0`}>
         <div className="flex items-center justify-between border-b border-line px-5 py-5">
           <div className="flex items-center gap-3 text-sm font-semibold tracking-[0.25em]"><span className="flex h-8 w-8 items-center justify-center rounded-xl bg-lilac text-ink">N</span>NOVA</div>
           <button className="text-slate-500 md:hidden" onClick={() => setSidebarOpen(false)}>✕</button>
@@ -85,15 +182,21 @@ export default function ChatClient({ user }: Props) {
           <div className="px-3 pb-3 pt-2 text-[0.65rem] font-semibold uppercase tracking-[0.2em] text-slate-600">Your conversations</div>
           {conversations.map((conversation) => (
             <div key={conversation._id} className={`group mb-1 flex items-center rounded-lg ${activeId === conversation._id ? "bg-white/[0.08]" : "hover:bg-white/[0.04]"}`}>
-              <button onClick={() => openConversation(conversation._id)} className="min-w-0 flex-1 truncate px-3 py-2.5 text-left text-sm text-slate-300">{conversation.title}</button>
-              <button onClick={() => deleteConversation(conversation._id)} aria-label="Delete conversation" className="mr-2 hidden text-xs text-slate-600 hover:text-red-300 group-hover:block">⌫</button>
+              <button onClick={() => openConversation(conversation._id)} className="min-w-0 flex-1 truncate px-3 py-2.5 text-left text-sm text-slate-300">
+                <span className="block truncate">{conversation.title}</span>
+                <span className="mt-1 block text-[0.65rem] text-slate-600">{formatTime(conversation.updatedAt)}</span>
+              </button>
+              <div className="mr-2 hidden items-center gap-1 group-hover:flex">
+                <button onClick={() => void renameConversation(conversation._id)} aria-label={`Rename ${conversation.title}`} className="p-1 text-xs text-slate-600 hover:text-violet-200">✎</button>
+                <button onClick={() => void deleteConversation(conversation._id)} aria-label={`Delete ${conversation.title}`} className="p-1 text-xs text-slate-600 hover:text-red-300">⌫</button>
+              </div>
             </div>
           ))}
           {!conversations.length && <p className="px-3 py-4 text-sm leading-6 text-slate-600">Your saved conversations will appear here.</p>}
         </div>
         <div className="border-t border-line p-4">
           <div className="flex items-center gap-3">
-            {user.image ? <div aria-label={`${user.name} profile photo`} role="img" className="h-9 w-9 rounded-full bg-cover bg-center" style={{ backgroundImage: `url("${user.image}")` }} /> : <div className="flex h-9 w-9 items-center justify-center rounded-full bg-violet-400/20 text-sm text-violet-200">{user.name[0]}</div>}
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-violet-400/20 text-sm text-violet-200">{user.name[0]}</div>
             <div className="min-w-0 flex-1"><p className="truncate text-sm text-white">{user.name}</p><p className="truncate text-xs text-slate-500">{user.email}</p></div>
             <span className="text-xs text-slate-500">Guest</span>
           </div>
@@ -103,25 +206,35 @@ export default function ChatClient({ user }: Props) {
       <section className="flex min-w-0 flex-1 flex-col">
         <header className="flex h-[73px] items-center border-b border-line px-5 md:px-8">
           <button onClick={() => setSidebarOpen(true)} className="mr-4 text-slate-400 md:hidden">☰</button>
-          <div><p className="text-sm font-medium text-white">{activeId ? conversations.find((item) => item._id === activeId)?.title : "New conversation"}</p><p className="mt-1 text-xs text-slate-600">OpenRouter · private workspace</p></div>
+          <div className="min-w-0"><p className="truncate text-sm font-medium text-white">{activeId ? conversations.find((item) => item._id === activeId)?.title || "Conversation" : "New conversation"}</p><p className="mt-1 text-xs text-slate-600">OpenRouter · private workspace</p></div>
+          {activeId && <button onClick={() => void clearConversation()} className="ml-4 hidden text-xs text-slate-500 hover:text-red-200 sm:block">Clear chat</button>}
           <div className="ml-auto flex items-center gap-2 text-xs text-slate-500"><span className="h-1.5 w-1.5 rounded-full bg-mint" /> ready</div>
         </header>
         <div className="flex-1 overflow-y-auto">
+          {error && <div role="alert" className="mx-auto mt-5 max-w-3xl px-5 md:px-8"><div className="rounded-xl border border-red-400/20 bg-red-400/10 px-4 py-3 text-sm text-red-200">{error}</div></div>}
           {messages.length === 0 ? (
             <div className="mx-auto flex h-full max-w-3xl flex-col justify-center px-6 pb-20">
               <span className="mb-6 text-5xl text-violet-300/80">✦</span>
               <h1 className="text-4xl font-semibold tracking-[-0.04em] text-white sm:text-5xl">Where should we start?</h1>
               <p className="mt-4 max-w-lg text-base leading-7 text-slate-500">Ask NOVA to think with you, work through a decision, or turn a rough idea into a clear next step.</p>
-              <div className="mt-9 flex flex-wrap gap-2 text-xs text-slate-400"><span className="rounded-full border border-line px-3 py-2">“Help me plan…”</span><span className="rounded-full border border-line px-3 py-2">“Think through…”</span><span className="rounded-full border border-line px-3 py-2">“Calculate…”</span></div>
+              <div className="mt-9 flex flex-wrap gap-2 text-xs text-slate-400">
+                {STARTER_PROMPTS.map((prompt) => <button key={prompt} onClick={() => void sendMessage(prompt)} className="rounded-full border border-line px-3 py-2 text-left transition hover:border-violet-400/60 hover:text-violet-200">{prompt}</button>)}
+              </div>
             </div>
           ) : (
             <div className="mx-auto max-w-3xl px-5 py-8 md:px-8">
-              {messages.map((message) => <div key={message._id} className={`mb-8 flex gap-4 ${message.role === "user" ? "justify-end" : ""}`}>
+              {messages.map((message, index) => <div key={message._id} className={`mb-8 flex gap-4 ${message.role === "user" ? "justify-end" : ""}`}>
                 {message.role === "assistant" && <div className="mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-lilac text-xs font-bold text-ink">N</div>}
-                <div className={message.role === "user" ? "max-w-[85%] rounded-2xl rounded-br-md bg-violet-500/15 px-4 py-3 text-sm leading-7 text-violet-50" : "min-w-0 flex-1 pt-1"}>{message.role === "assistant" ? <MarkdownMessage content={message.content} /> : message.content}</div>
+                <div className={message.role === "user" ? "max-w-[85%] rounded-2xl rounded-br-md bg-violet-500/15 px-4 py-3 text-sm leading-7 text-violet-50" : "min-w-0 flex-1 pt-1"}>
+                  {message.role === "assistant" ? <MarkdownMessage content={message.content} /> : message.content}
+                  <div className={`mt-2 flex items-center gap-3 text-[0.65rem] text-slate-600 ${message.role === "user" ? "justify-end" : ""}`}>
+                    <time dateTime={message.createdAt}>{formatTime(message.createdAt)}</time>
+                    {message.role === "assistant" && <button onClick={() => void copyAnswer(message.content)} className="hover:text-violet-200">Copy answer</button>}
+                    {message.role === "assistant" && index === messages.length - 1 && <button onClick={() => void regenerateAnswer(message._id)} className="hover:text-violet-200">Regenerate</button>}
+                  </div>
+                </div>
               </div>)}
               {loading && <div className="flex items-center gap-4 text-sm text-slate-500"><div className="flex h-7 w-7 items-center justify-center rounded-lg bg-lilac text-xs font-bold text-ink">N</div><span className="flex gap-1"><i className="h-1.5 w-1.5 animate-bounce rounded-full bg-violet-300" /><i className="h-1.5 w-1.5 animate-bounce rounded-full bg-violet-300 [animation-delay:120ms]" /><i className="h-1.5 w-1.5 animate-bounce rounded-full bg-violet-300 [animation-delay:240ms]" /></span></div>}
-              {error && <div className="mt-6 rounded-xl border border-red-400/20 bg-red-400/10 px-4 py-3 text-sm text-red-200">{error}</div>}
               <div ref={bottomRef} />
             </div>
           )}

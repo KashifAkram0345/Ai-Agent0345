@@ -11,7 +11,7 @@ Copy `.env.example` to `.env.local` and add these values through Replit Secrets 
 | `MONGODB_URI` | Your MongoDB connection string |
 | `OPENROUTER_API_KEY` | OpenRouter API key |
 | `OPENROUTER_MODEL` | OpenRouter model ID, defaults to `openrouter/free` |
-| `NEXTAUTH_URL` | Optional public app URL sent as OpenRouter request metadata |
+| `OPENROUTER_SITE_URL` | Optional public app URL sent as OpenRouter request metadata |
 
 An anonymous session cookie is created automatically for each browser. No OAuth credentials are required.
 
